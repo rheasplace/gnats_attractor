@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gnat Swarm — Field Observation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+<style>
+  :root{
+    --soil:#0b0f0a;
+    --panel:#12160f;
+    --panel-line:#2a3324;
+    --moss:#6b7d5c;
+    --cream:#e8e6d9;
+    --cream-dim:#a8a696;
+    --amber:#d4a017;
+    --amber-dim:#8a6a12;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    background:var(--soil);
+    color:var(--cream);
+    font-family:'Space Mono', monospace;
+    min-height:100vh;
+  }
+  .wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 40px;
+    gap:20px;
+  }
+  header{
+    text-align:center;
+    max-width:640px;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:0.28em;
+    text-transform:uppercase;
+    color:var(--amber);
+    margin-bottom:8px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-style:italic;
+    font-size:clamp(28px, 5vw, 40px);
+    margin:0 0 8px;
+    color:var(--cream);
+    letter-spacing:0.01em;
+  }
+  .sub{
+    font-size:13px;
+    line-height:1.6;
+    color:var(--cream-dim);
+    margin:0;
+  }
+  .stage{
+    position:relative;
+    width:min(720px, 92vw);
+    aspect-ratio:4/3;
+    background:#040603;
+    border:1px solid var(--panel-line);
+    border-radius:2px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px #000, 0 30px 60px -20px rgba(0,0,0,0.7);
+  }
+  .stage canvas{
+    display:block;
+    width:100% !important;
+    height:100% !important;
+  }
+  .corner-tag{
+    position:absolute;
+    font-size:10px;
+    letter-spacing:0.15em;
+    color:var(--amber);
+    background:rgba(11,15,10,0.75);
+    padding:4px 8px;
+    border:1px solid var(--panel-line);
+    z-index:5;
+    pointer-events:none;
+    text-transform:uppercase;
+  }
+  .tag-tl{ top:10px; left:10px; }
+  .tag-br{ bottom:10px; right:10px; text-align:right; }
+  .hint{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:24px;
+    font-size:13px;
+    color:var(--cream-dim);
+    background: radial-gradient(circle at center, rgba(20,25,16,0.4), rgba(4,6,3,0.85));
+    z-index:4;
+    transition:opacity 0.5s ease;
+  }
+  .hint.hidden{ opacity:0; pointer-events:none; }
+  .hint b{ color:var(--amber); font-weight:400; font-style:italic; font-family:'Fraunces',serif; }
+
+  .panel{
+    width:min(720px, 92vw);
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    padding:20px 22px 24px;
+  }
+  .panel-title{
+    font-size:10px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--moss);
+    margin:0 0 16px;
+    display:flex;
+    justify-content:space-between;
+    border-bottom:1px solid var(--panel-line);
+    padding-bottom:10px;
+  }
+  .panel-title span.count{ color:var(--amber); }
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px 24px;
+  }
+  @media (max-width: 520px){
+    .grid{ grid-template-columns:1fr; }
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{
+    font-size:11px;
+    color:var(--cream-dim);
+    display:flex;
+    justify-content:space-between;
+    letter-spacing:0.02em;
+  }
+  .field label .val{ color:var(--amber); }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:2px;
+    background:var(--panel-line);
+    outline:none;
+    margin:8px 0 2px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:11px; height:11px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid var(--soil);
+    cursor:pointer;
+    margin-top:-1px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid var(--soil);
+    cursor:pointer;
+  }
+  input[type=color]{
+    -webkit-appearance:none;
+    width:100%;
+    height:28px;
+    background:none;
+    border:1px solid var(--panel-line);
+    padding:2px;
+    cursor:pointer;
+    border-radius:1px;
+  }
+  input[type=color]::-webkit-color-swatch-wrapper{ padding:0; }
+  input[type=color]::-webkit-color-swatch{ border:none; }
+
+  .buttons{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    background:transparent;
+    color:var(--cream);
+    border:1px solid var(--panel-line);
+    padding:9px 14px;
+    cursor:pointer;
+    transition:border-color 0.2s, color 0.2s;
+  }
+  button:hover{
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+  button.primary{
+    border-color:var(--amber-dim);
+    color:var(--amber);
+  }
+  button.primary:hover{
+    border-color:var(--amber);
+  }
+  footer{
+    max-width:640px;
+    text-align:center;
+    font-size:11px;
+    color:var(--cream-dim);
+    line-height:1.7;
+    opacity:0.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Specimen Log · No. 0117</div>
+    <h1>The gnats found your face</h1>
+    <p class="sub">A small swarm circles the point you mark, occasionally landing before darting off again. Click the frame to move the swarm's anchor.</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="corner-tag tag-tl" id="tagStatus">Live observation window</div>
+    <div class="corner-tag tag-br" id="tagCount">0 specimens</div>
+    <div class="hint" id="camHint">
+      Allow camera access to swarm around your <b>actual</b> face —<br>
+      or just click anywhere in the frame to set the anchor.
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Swarm controls <span><span class="count" id="countLabel">80</span> gnats</span></p>
+    <div class="grid">
+      <div class="field">
+        <label>Swarm size <span class="val" id="vCount">80</span></label>
+        <input type="range" id="count" min="5" max="300" value="80" step="1">
+      </div>
+      <div class="field">
+        <label>Gnat colour</label>
+        <input type="color" id="gnatColor" value="#d4a017">
+      </div>
+      <div class="field">
+        <label>Flight speed <span class="val" id="vSpeed">1.4</span></label>
+        <input type="range" id="speed" min="0.3" max="4" value="1.4" step="0.1">
+      </div>
+      <div class="field">
+        <label>Swarm radius <span class="val" id="vRadius">90</span></label>
+        <input type="range" id="radius" min="20" max="220" value="90" step="1">
+      </div>
+      <div class="field">
+        <label>Erratic jitter <span class="val" id="vJitter">55</span></label>
+        <input type="range" id="jitter" min="0" max="100" value="55" step="1">
+      </div>
+      <div class="field">
+        <label>Drift-to-face frequency <span class="val" id="vDrift">30</span></label>
+        <input type="range" id="drift" min="0" max="100" value="30" step="1">
+      </div>
+      <div class="field">
+        <label>Gnat size <span class="val" id="vSize">3.0</span></label>
+        <input type="range" id="size" min="1" max="8" value="3" step="0.2">
+      </div>
+      <div class="field">
+        <label>Trail fade <span class="val" id="vFade">18</span></label>
+        <input type="range" id="fade" min="2" max="60" value="18" step="1">
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="btnCam">Enable camera</button>
+      <button id="btnTrack">Auto-track face: on</button>
+      <button id="btnCenter">Reset anchor to centre</button>
+      <button id="btnScatter">Scatter swarm</button>
+    </div>
+  </div>
+
+  <footer>Built with p5.js. Camera video, if enabled, stays in your browser and is never uploaded anywhere. If a permission prompt doesn't appear, check your browser's site settings.</footer>
+</div>
+
+<script>
+new p5((p) => {
+  let gnats = [];
+  let anchor = null;
+  let targetAnchor = null;
+  let video = null;
+  let camOn = false;
+  let camRequested = false;
+  let W = 720, H = 540;
+
+  let modelsReady = false;
+  let modelsLoading = false;
+  let faceDetected = false;
+  let autoTrack = true;
+  const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+
+  // control refs
+  const els = {};
+  const ids = ['count','gnatColor','speed','radius','jitter','drift','size','fade'];
+
+  function bindControls(){
+    ids.forEach(id => els[id] = document.getElementById(id));
+    els.count.addEventListener('input', () => {
+      document.getElementById('vCount').textContent = els.count.value;
+      document.getElementById('countLabel').textContent = els.count.value;
+      syncGnatCount();
+    });
+    els.speed.addEventListener('input', () => document.getElementById('vSpeed').textContent = parseFloat(els.speed.value).toFixed(1));
+    els.radius.addEventListener('input', () => document.getElementById('vRadius').textContent = els.radius.value);
+    els.jitter.addEventListener('input', () => document.getElementById('vJitter').textContent = els.jitter.value);
+    els.drift.addEventListener('input', () => document.getElementById('vDrift').textContent = els.drift.value);
+    els.size.addEventListener('input', () => document.getElementById('vSize').textContent = parseFloat(els.size.value).toFixed(1));
+    els.fade.addEventListener('input', () => document.getElementById('vFade').textContent = els.fade.value);
+
+    document.getElementById('btnCam').addEventListener('click', requestCamera);
+    document.getElementById('btnTrack').addEventListener('click', () => {
+      autoTrack = !autoTrack;
+      document.getElementById('btnTrack').textContent = 'Auto-track face: ' + (autoTrack ? 'on' : 'off');
+      document.getElementById('tagStatus').textContent = autoTrack ? 'Searching for face…' : 'Manual anchor mode';
+    });
+    document.getElementById('btnCenter').addEventListener('click', () => {
+      anchor.x = W/2; anchor.y = H/2;
+      targetAnchor.x = W/2; targetAnchor.y = H/2;
+    });
+    document.getElementById('btnScatter').addEventListener('click', () => {
+      gnats.forEach(g => { g.vel.set(p.random(-4,4), p.random(-4,4)); g.mode='swarm'; g.landTimer=0; });
+    });
+  }
+
+  function requestCamera(){
+    if (camRequested) return;
+    camRequested = true;
+    document.getElementById('btnCam').textContent = 'Requesting…';
+    document.getElementById('tagStatus').textContent = 'Requesting camera…';
+    try{
+      video = p.createCapture({ video: { facingMode: 'user' } }, () => {
+        camOn = true;
+        video.hide();
+        document.getElementById('camHint').classList.add('hidden');
+        document.getElementById('btnCam').textContent = 'Camera active';
+        loadModels();
+      });
+      video.elt.addEventListener('error', camFailed);
+      setTimeout(() => { if(!camOn) camFailed(); }, 6000);
+    }catch(e){
+      camFailed();
+    }
+  }
+
+  function camFailed(){
+    document.getElementById('btnCam').textContent = 'Camera unavailable';
+    document.getElementById('tagStatus').textContent = 'Manual anchor mode';
+    document.getElementById('camHint').innerHTML = 'Camera unavailable in this view.<br>Click anywhere in the frame to set the swarm anchor.';
+  }
+
+  async function loadModels(){
+    if (modelsLoading || modelsReady) return;
+    modelsLoading = true;
+    document.getElementById('tagStatus').textContent = 'Loading face model…';
+    try{
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      modelsReady = true;
+      document.getElementById('tagStatus').textContent = 'Searching for face…';
+      detectLoop();
+    }catch(e){
+      document.getElementById('tagStatus').textContent = 'Face model failed to load — manual anchor only';
+      autoTrack = false;
+      document.getElementById('btnTrack').textContent = 'Auto-track face: unavailable';
+      document.getElementById('btnTrack').disabled = true;
+    }
+  }
+
+  async function detectLoop(){
+    if (!camOn || !modelsReady) return;
+    if (autoTrack && video && video.elt.readyState === 4){
+      try{
+        const det = await faceapi.detectSingleFace(
+          video.elt,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+        );
+        if (det){
+          const box = det.box;
+          const vw = video.elt.videoWidth || W;
+          const vh = video.elt.videoHeight || H;
+          const scaleX = W / vw, scaleY = H / vh;
+          const cx = (box.x + box.width / 2) * scaleX;
+          const cy = (box.y + box.height / 2) * scaleY;
+          targetAnchor.x = W - cx; // mirror to match mirrored video draw
+          targetAnchor.y = cy;
+          faceDetected = true;
+          document.getElementById('tagStatus').textContent = 'Face detected — swarming';
+        } else {
+          faceDetected = false;
+          document.getElementById('tagStatus').textContent = 'Searching for face…';
+        }
+      }catch(e){
+        faceDetected = false;
+      }
+    }
+    setTimeout(detectLoop, 160);
+  }
+
+  class Gnat {
+    constructor(){
+      this.pos = p.createVector(anchor.x + p.random(-40,40), anchor.y + p.random(-40,40));
+      this.vel = p5.Vector.random2D().mult(p.random(0.5,2));
+      this.noiseOff = p.random(1000);
+      this.wingPhase = p.random(1000);
+      this.mode = 'swarm';
+      this.landTimer = 0;
+      this.landTarget = p.createVector(0,0);
+    }
+    update(cfg){
+      const toAnchor = p5.Vector.sub(anchor, this.pos);
+      const dist = toAnchor.mag();
+
+      if (this.mode === 'swarm'){
+        // random chance to start landing
+        if (p.random(1000) < cfg.driftChance){
+          this.mode = 'landing';
+          this.landTimer = p.random(40, 110);
+          const a = p.random(p.TWO_PI);
+          const r = p.random(4, 22);
+          this.landTarget = p5.Vector.add(anchor, p.createVector(Math.cos(a)*r, Math.sin(a)*r));
+        }
+
+        let steer = p.createVector(0,0);
+        // attraction toward swarm radius shell
+        if (dist > cfg.radius){
+          steer.add(toAnchor.copy().setMag(0.18));
+        } else {
+          // gentle orbit/tangential swirl while inside radius
+          const tangent = p.createVector(-toAnchor.y, toAnchor.x).normalize();
+          steer.add(tangent.mult(0.06));
+          steer.add(toAnchor.copy().setMag(0.02));
+        }
+        // erratic wander via noise
+        const n = p.noise(this.noiseOff + p.frameCount * 0.02) * p.TWO_PI * 4;
+        const wander = p5.Vector.fromAngle(n).mult(cfg.jitter);
+        steer.add(wander);
+
+        this.vel.add(steer);
+        this.vel.limit(cfg.speed * 2.2);
+        this.pos.add(p5.Vector.mult(this.vel, cfg.speed));
+
+      } else { // landing
+        const toTarget = p5.Vector.sub(this.landTarget, this.pos);
+        const d2 = toTarget.mag();
+        if (d2 > 1){
+          this.vel.lerp(toTarget.copy().limit(1.2), 0.12);
+        } else {
+          this.vel.mult(0.85);
+        }
+        // tiny tremor while sitting
+        this.vel.add(p5.Vector.random2D().mult(0.03));
+        this.pos.add(p5.Vector.mult(this.vel, cfg.speed * 0.6));
+
+        this.landTimer--;
+        if (this.landTimer <= 0){
+          this.mode = 'swarm';
+          this.vel.add(p5.Vector.random2D().mult(p.random(1.5,3.5))); // dart away
+        }
+      }
+
+      // soft bounds so gnats don't fly off canvas forever
+      const margin = 20;
+      if (this.pos.x < -margin) this.pos.x = -margin;
+      if (this.pos.x > W+margin) this.pos.x = W+margin;
+      if (this.pos.y < -margin) this.pos.y = -margin;
+      if (this.pos.y > H+margin) this.pos.y = H+margin;
+    }
+    draw(col, sz){
+      const heading = this.vel.heading();
+      p.push();
+      p.translate(this.pos.x, this.pos.y);
+      p.rotate(heading);
+      p.noStroke();
+      // wings
+      this.wingPhase += 0.9;
+      const flap = Math.sin(this.wingPhase) * sz * 0.9;
+      p.fill(col.levels[0], col.levels[1], col.levels[2], 90);
+      p.ellipse(-sz*0.2, -flap*0.5, sz*1.6, sz*0.7);
+      p.ellipse(-sz*0.2, flap*0.5, sz*1.6, sz*0.7);
+      // body
+      p.fill(col.levels[0], col.levels[1], col.levels[2], 230);
+      p.ellipse(0, 0, sz*1.4, sz*0.8);
+      p.ellipse(sz*0.9, 0, sz*0.6, sz*0.5);
+      p.pop();
+    }
+  }
+
+  function syncGnatCount(){
+    const target = parseInt(els.count.value);
+    if (gnats.length < target){
+      while (gnats.length < target) gnats.push(new Gnat());
+    } else if (gnats.length > target){
+      gnats.length = target;
+    }
+  }
+
+  function getConfig(){
+    return {
+      speed: parseFloat(els.speed.value),
+      radius: parseFloat(els.radius.value),
+      jitter: parseFloat(els.jitter.value) / 100 * 0.6,
+      driftChance: parseFloat(els.drift.value) / 100 * 1.2,
+      size: parseFloat(els.size.value),
+      fade: parseFloat(els.fade.value)
+    };
+  }
+
+  p.setup = () => {
+    const stage = document.getElementById('stage');
+    const rect = stage.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    const cnv = p.createCanvas(W, H);
+    cnv.parent('stage');
+    cnv.style('position','absolute');
+    cnv.style('top','0'); cnv.style('left','0'); cnv.style('z-index','1');
+    p.pixelDensity(1);
+    p.frameRate(60);
+    anchor = p.createVector(W/2, H/2);
+    targetAnchor = p.createVector(W/2, H/2);
+
+    bindControls();
+    for (let i=0;i<parseInt(els.count.value);i++) gnats.push(new Gnat());
+
+    cnv.mousePressed(() => {
+      if (p.mouseX >=0 && p.mouseX <= W && p.mouseY >=0 && p.mouseY <= H){
+        anchor.x = p.mouseX; anchor.y = p.mouseY;
+        targetAnchor.x = p.mouseX; targetAnchor.y = p.mouseY;
+        autoTrack = false;
+        document.getElementById('btnTrack').textContent = 'Auto-track face: off';
+        document.getElementById('tagStatus').textContent = 'Manual anchor mode';
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      const r = stage.getBoundingClientRect();
+      W = r.width; H = r.height;
+      p.resizeCanvas(W, H);
+      if (video) { video.size(W, H); }
+    });
+  };
+
+  p.draw = () => {
+    const cfg = getConfig();
+
+    if (autoTrack && faceDetected){
+      anchor.x = p.lerp(anchor.x, targetAnchor.x, 0.15);
+      anchor.y = p.lerp(anchor.y, targetAnchor.y, 0.15);
+    }
+
+    // backdrop
+    if (camOn && video){
+      p.push();
+      p.translate(W, 0); p.scale(-1, 1); // mirror like a mirror-facing user
+      p.image(video, 0, 0, W, H);
+      p.pop();
+      p.noStroke();
+      p.fill(4,6,3, cfg.fade);
+      p.rect(0,0,W,H);
+    } else {
+      p.noStroke();
+      p.fill(4,6,3, camOn ? cfg.fade : 255);
+      p.rect(0,0,W,H);
+      if (!camOn){
+        // faint vignette + anchor marker
+        const g = p.drawingContext.createRadialGradient(anchor.x, anchor.y, 10, anchor.x, anchor.y, Math.max(W,H)*0.6);
+        g.addColorStop(0, 'rgba(60,70,45,0.25)');
+        g.addColorStop(1, 'rgba(4,6,3,0)');
+        p.drawingContext.fillStyle = g;
+        p.drawingContext.fillRect(0,0,W,H);
+      }
+    }
+
+    // anchor crosshair
+    p.stroke(212,160,23,120);
+    p.strokeWeight(1);
+    p.noFill();
+    p.circle(anchor.x, anchor.y, 10);
+    p.line(anchor.x-14, anchor.y, anchor.x-6, anchor.y);
+    p.line(anchor.x+6, anchor.y, anchor.x+14, anchor.y);
+    p.line(anchor.x, anchor.y-14, anchor.x, anchor.y-6);
+    p.line(anchor.x, anchor.y+6, anchor.x, anchor.y+14);
+
+    const col = p.color(els.gnatColor.value);
+    for (const g of gnats){
+      g.update(cfg);
+      g.draw(col, cfg.size);
+    }
+
+    document.getElementById('tagCount').textContent = gnats.length + ' specimens';
+  };
+
+}, 'stage');
+</script>
+</body>
+</html>
