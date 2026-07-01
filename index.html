@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gnat Swarm — Field Observation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+  :root{
+    --paper:#e9e1cf;
+    --paper-2:#f2ecdd;
+    --ink:#2b271f;
+    --ink-soft:#6a6353;
+    --line:#c8bda2;
+    --rust:#9a4b2e;
+    --olive:#5f6338;
+    --frame:#20201a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper);
+    background-image:
+      radial-gradient(circle at 20% 15%, rgba(0,0,0,.035) 0 1px, transparent 1.4px),
+      radial-gradient(circle at 70% 60%, rgba(0,0,0,.03) 0 1px, transparent 1.4px);
+    background-size:26px 26px, 33px 33px;
+    color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    -webkit-font-smoothing:antialiased;
+    padding:34px 20px 60px;
+  }
+  .mono{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+  .sheet{
+    max-width:1080px;margin:0 auto;
+    background:var(--paper-2);
+    border:1px solid var(--line);
+    box-shadow:0 1px 0 #fff inset, 0 18px 40px -24px rgba(40,34,24,.5);
+    padding:30px 34px 34px;
+    position:relative;
+  }
+  .sheet::before{
+    content:"";position:absolute;left:-1px;top:-1px;right:-1px;bottom:-1px;
+    border:1px solid rgba(43,39,31,.14);margin:6px;pointer-events:none;
+  }
+  header.top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1.5px solid var(--ink);padding-bottom:8px;
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  }
+  header.top .r{color:var(--ink-soft)}
+  h1{
+    font-size:clamp(30px,5vw,52px);line-height:1.02;font-weight:600;
+    margin:20px 0 6px;letter-spacing:-.01em;
+  }
+  .lead{max-width:62ch;color:var(--ink-soft);font-size:16px;line-height:1.55;margin:0 0 22px}
+  .lead b{color:var(--ink);font-style:italic;font-weight:600}
+
+  .frame-wrap{position:relative}
+  .frame-label{
+    position:absolute;top:-9px;left:16px;background:var(--paper-2);
+    padding:0 8px;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-soft);z-index:3;
+  }
+  .frame{
+    position:relative;width:100%;aspect-ratio:4/3;
+    background:#171712;border:2px solid var(--frame);
+    box-shadow:0 0 0 1px rgba(255,255,255,.05) inset, 0 20px 40px -26px rgba(0,0,0,.7);
+    overflow:hidden;cursor:crosshair;
+  }
+  .frame canvas{display:block;width:100%!important;height:100%!important}
+  /* crosshair reticle corners */
+  .frame .tick{position:absolute;width:16px;height:16px;border:1px solid rgba(255,255,255,.35);z-index:2;pointer-events:none}
+  .frame .tick.tl{top:8px;left:8px;border-right:0;border-bottom:0}
+  .frame .tick.tr{top:8px;right:8px;border-left:0;border-bottom:0}
+  .frame .tick.bl{bottom:8px;left:8px;border-right:0;border-top:0}
+  .frame .tick.br{bottom:8px;right:8px;border-left:0;border-top:0}
+
+  .hud{position:absolute;z-index:2;pointer-events:none;color:#e8e2d0;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.04em;
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .hud.count{top:12px;left:14px;font-size:13px}
+  .hud.count b{font-size:22px;font-weight:600}
+  .hud.status{top:14px;right:16px;text-align:right}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#b9553a;margin-left:6px;vertical-align:middle}
+  .dot.live{background:#7fae54;box-shadow:0 0 8px #7fae54}
+  .dot.seek{background:#d8a34a;box-shadow:0 0 8px #d8a34a}
+  .hud.hint{left:0;right:0;bottom:12px;text-align:center;opacity:.85}
+
+  /* controls */
+  .console{margin-top:26px;border-top:1.5px solid var(--ink);padding-top:16px}
+  .console-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
+  .console-head h2{font-size:14px;letter-spacing:.2em;text-transform:uppercase;margin:0;font-family:ui-monospace,Menlo,monospace;font-weight:600}
+  .console-head .sub{font-size:12px;color:var(--ink-soft);font-family:ui-monospace,Menlo,monospace}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px 30px}
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl .row{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-family:ui-monospace,Menlo,monospace;color:var(--ink-soft)}
+  .ctl .row .val{color:var(--ink);font-size:12px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:var(--line);outline:none;margin:6px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ink);border:2px solid var(--paper-2);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--ink);border:2px solid var(--paper-2);cursor:pointer}
+  .swatches{display:flex;gap:8px;margin-top:2px}
+  .swatch{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:0 0 0 1px var(--line)}
+  .swatch.sel{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  button.act{
+    font-family:ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:.06em;
+    padding:10px 16px;background:var(--paper);color:var(--ink);
+    border:1.5px solid var(--ink);cursor:pointer;transition:.14s;
+  }
+  button.act:hover{background:var(--ink);color:var(--paper-2)}
+  button.act.primary{background:var(--rust);border-color:var(--rust);color:#f6efe0}
+  button.act.primary:hover{background:#7e3c24}
+  button.act[aria-pressed=true]{background:var(--olive);border-color:var(--olive);color:#f4f0df}
+  button.act[disabled]{opacity:.4;cursor:default}
+  .cam-msg{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--rust);margin-top:10px;min-height:1em}
+
+  footer.note{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);
+    font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.6;color:var(--ink-soft);max-width:70ch}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="top">
+    <span>Specimen Log · Diptera</span>
+    <span class="r">No. 0117</span>
+  </header>
+
+  <h1>The gnats found your face</h1>
+  <p class="lead">A small swarm circles the point you mark, occasionally landing before darting off again. Enable the camera and it will orbit your <b>actual</b> face — or just click anywhere in the frame to set the anchor.</p>
+
+  <div class="frame-wrap">
+    <span class="frame-label">Live observation window</span>
+    <div class="frame" id="frame">
+      <span class="tick tl"></span><span class="tick tr"></span>
+      <span class="tick bl"></span><span class="tick br"></span>
+      <div class="hud count"><b id="count">80</b> specimens</div>
+      <div class="hud status" id="status">anchor: manual <span class="dot" id="statusDot"></span></div>
+      <div class="hud hint" id="hint">click the frame to move the swarm's anchor</div>
+      <!-- p5 canvas mounts here -->
+    </div>
+  </div>
+
+  <section class="console">
+    <div class="console-head">
+      <h2>Swarm controls</h2>
+      <span class="sub" id="subCount">80 gnats</span>
+    </div>
+    <div class="grid">
+      <div class="ctl">
+        <div class="row"><span>Swarm size</span><span class="val" id="v_count">80</span></div>
+        <input type="range" id="s_count" min="8" max="400" step="1" value="80">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Flight speed</span><span class="val" id="v_speed">1.4</span></div>
+        <input type="range" id="s_speed" min="0.3" max="4" step="0.1" value="1.4">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Swarm radius</span><span class="val" id="v_radius">90</span></div>
+        <input type="range" id="s_radius" min="20" max="220" step="1" value="90">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Erratic jitter</span><span class="val" id="v_jitter">55</span></div>
+        <input type="range" id="s_jitter" min="0" max="100" step="1" value="55">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Drift-to-anchor</span><span class="val" id="v_pull">30</span></div>
+        <input type="range" id="s_pull" min="0" max="100" step="1" value="30">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Gnat size</span><span class="val" id="v_gsize">3.0</span></div>
+        <input type="range" id="s_gsize" min="1" max="8" step="0.1" value="3.0">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Trail fade</span><span class="val" id="v_trail">18</span></div>
+        <input type="range" id="s_trail" min="4" max="60" step="1" value="18">
+      </div>
+      <div class="ctl">
+        <div class="row"><span>Gnat colour</span></div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="act primary" id="btnCam">Enable camera</button>
+      <button class="act" id="btnTrack" aria-pressed="true">Auto-track face: on</button>
+      <button class="act" id="btnReset">Reset anchor to centre</button>
+      <button class="act" id="btnScatter">Scatter swarm</button>
+    </div>
+    <div class="cam-msg" id="camMsg"></div>
+  </section>
+
+  <footer class="note">
+    Built with p5.js · face tracking by MediaPipe BlazeFace. Camera video stays in your browser and is never uploaded anywhere. If a permission prompt doesn't appear, check your browser's site settings (camera requires a secure https:// origin).
+  </footer>
+</div>
+
+<!-- ===================== FACE DETECTION (MediaPipe) ===================== -->
+<script type="module">
+  import { FaceDetector, FilesetResolver }
+    from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+  // Shared state read by the p5 sketch
+  window.faceState = { found:false, x:0.5, y:0.5, size:0.3, lastSeen:0 };
+  window.cam = { on:false, ready:false, video:null };
+
+  let detector = null, initing = false, lastVideoTime = -1;
+  let lastDetect = 0;
+  const DETECT_INTERVAL = 66; // ~15 fps — keeps detection off the render's back
+
+  async function initDetector(){
+    if (detector || initing) return detector;
+    initing = true;
+    try{
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+      const opts = (delegate)=>({
+        baseOptions:{
+          modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+          delegate
+        },
+        runningMode:"VIDEO",
+        minDetectionConfidence:0.5
+      });
+      // CPU delegate is far more compatible; GPU can hang/freeze on some machines.
+      try{
+        detector = await FaceDetector.createFromOptions(vision, opts("CPU"));
+      }catch(cpuErr){
+        detector = await FaceDetector.createFromOptions(vision, opts("GPU"));
+      }
+    } finally {
+      initing = false;
+    }
+    return detector;
+  }
+
+  window.startCamera = async function(setMsg){
+    try{
+      setMsg("initialising face model…");
+      await initDetector();
+      setMsg("requesting camera…");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:"user", width:{ideal:640}, height:{ideal:480} }, audio:false
+      });
+      const video = document.createElement("video");
+      video.playsInline = true; video.muted = true; video.srcObject = stream;
+      await video.play();
+      window.cam.video = video;
+      window.cam.on = true;
+      window.cam.ready = true;
+      setMsg("");
+      loop();
+      return true;
+    }catch(err){
+      window.cam.on = false;
+      const name = err && err.name ? err.name : "";
+      let msg;
+      if (name === "NotAllowedError" || name === "SecurityError"){
+        if (window.self !== window.top){
+          msg = "camera blocked: this embedded preview can't access the camera — open the page in its own browser tab over https:// to enable it.";
+        } else if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1"){
+          msg = "camera needs a secure origin — open this page over https:// (GitHub Pages works) or localhost, not file://.";
+        } else {
+          msg = "camera permission was denied — allow camera in your browser's site settings, then click Enable camera again.";
+        }
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError"){
+        msg = "no camera found on this device.";
+      } else {
+        msg = "camera unavailable: " + (err && err.message ? err.message : err);
+      }
+      setMsg(msg);
+      return false;
+    }
+  };
+
+  window.stopCamera = function(){
+    const v = window.cam.video;
+    if (v && v.srcObject){ v.srcObject.getTracks().forEach(t=>t.stop()); }
+    window.cam.on = false; window.cam.ready = false; window.cam.video = null;
+    window.faceState.found = false;
+  };
+
+  function loop(){
+    const v = window.cam.video;
+    if (!window.cam.on || !detector || !v){ return; }
+    const now = performance.now();
+    // Throttle: don't run the (synchronous, main-thread) detector every frame —
+    // that's what stalls/freezes the page on slower machines.
+    if (now - lastDetect >= DETECT_INTERVAL &&
+        v.readyState >= 2 && v.videoWidth > 0 && v.currentTime !== lastVideoTime){
+      lastDetect = now;
+      lastVideoTime = v.currentTime;
+      try{
+        const res = detector.detectForVideo(v, now);
+        const d = res.detections && res.detections[0];
+        if (d){
+          const bb = d.boundingBox; // pixel coords in the video frame
+          const cx = (bb.originX + bb.width/2)  / v.videoWidth;   // 0..1
+          const cy = (bb.originY + bb.height/2) / v.videoHeight;  // 0..1
+          window.faceState.found = true;
+          window.faceState.x = cx;
+          window.faceState.y = cy;
+          window.faceState.size = bb.width / v.videoWidth;
+          window.faceState.lastSeen = now;
+        } else if (now - window.faceState.lastSeen > 500){
+          window.faceState.found = false;
+        }
+      }catch(e){ /* transient frame errors are fine */ }
+    }
+    requestAnimationFrame(loop);
+  }
+</script>
+
+<!-- ===================== SWARM (p5.js) ===================== -->
+<script>
+(function(){
+  const PALETTE = ["#e9e1cf","#d8a34a","#9a4b2e","#7fae54","#8fb0c9"];
+  const P = {
+    count:80, speed:1.4, radius:90, jitter:55, pull:30,
+    gsize:3.0, trail:18, colour:"#e9e1cf"
+  };
+
+  let gnats = [];
+  let manual = null;        // {x,y} in canvas coords
+  let autoTrack = true;
+  let W = 800, H = 600;
+
+  // ---- Gnat ----
+  function makeGnat(){
+    return {
+      x: W/2 + p5rand(-40,40), y: H/2 + p5rand(-40,40),
+      vx: p5rand(-1,1), vy: p5rand(-1,1),
+      phase: Math.random()*1000,
+      wob: 0.6 + Math.random()*0.9,
+      landing:false, landTimer:0, seed:Math.random()*10000,
+      size: 0.7 + Math.random()*0.6
+    };
+  }
+  function p5rand(a,b){ return a + Math.random()*(b-a); }
+
+  function resizeSwarm(n){
+    n = Math.round(n);
+    if (n > gnats.length){ while(gnats.length<n) gnats.push(makeGnat()); }
+    else gnats.length = n;
+  }
+
+  const sketch = (s)=>{
+    s.setup = function(){
+      const frame = document.getElementById("frame");
+      W = frame.clientWidth; H = frame.clientHeight;
+      const cv = s.createCanvas(W, H);
+      cv.parent(frame);
+      s.pixelDensity(Math.min(2, window.devicePixelRatio||1));
+      manual = { x:W/2, y:H/2 };
+      resizeSwarm(P.count);
+      s.background(23,23,18);
+    };
+
+    s.windowResized = function(){
+      const frame = document.getElementById("frame");
+      const nw = frame.clientWidth, nh = frame.clientHeight;
+      if (Math.abs(nw-W)<2 && Math.abs(nh-H)<2) return;
+      const rx = nw/W, ry = nh/H;
+      W = nw; H = nh; s.resizeCanvas(W,H);
+      if (manual){ manual.x*=rx; manual.y*=ry; }
+      s.background(23,23,18);
+    };
+
+    // where the swarm should center this frame
+    function currentAnchor(){
+      const fs = window.faceState;
+      const camOn = window.cam && window.cam.on;
+      if (autoTrack && camOn && fs.found){
+        // map normalised face coords -> canvas, mirrored horizontally (selfie view)
+        return { x:(1-fs.x)*W, y:fs.y*H, tracking:true };
+      }
+      return { x:manual.x, y:manual.y, tracking:false };
+    }
+
+    s.draw = function(){
+      const camOn = window.cam && window.cam.on && window.cam.ready;
+      const anchor = currentAnchor();
+
+      // ---- background / trails ----
+      if (camOn && window.cam.video && window.cam.video.videoWidth>0){
+        drawVideoCover(window.cam.video);
+        // slight dark veil so gnats read against bright video
+        s.noStroke(); s.fill(15,15,12, 70); s.rect(0,0,W,H);
+      } else {
+        s.noStroke();
+        s.fill(23,23,18, P.trail*4.2);   // higher fade => shorter trails
+        s.rect(0,0,W,H);
+      }
+
+      // ---- anchor marker ----
+      s.noFill();
+      s.stroke(anchor.tracking ? "rgba(127,174,84,0.5)" : "rgba(216,163,74,0.35)");
+      s.strokeWeight(1);
+      s.circle(anchor.x, anchor.y, 14 + 4*Math.sin(s.frameCount*0.08));
+
+      // ---- update + draw gnats ----
+      const col = s.color(P.colour);
+      const speed = P.speed;
+      const radius = P.radius;
+      const jit = P.jitter/100;
+      const pull = P.pull/100;
+
+      s.noStroke();
+      for (let i=0;i<gnats.length;i++){
+        const g = gnats[i];
+        const t = (s.frameCount + g.phase);
+
+        // target: a wandering point on an orbit around the anchor
+        const na = s.noise(g.seed, t*0.004) * s.TWO_PI * 3;
+        const nr = s.noise(g.seed+50, t*0.005);
+        const orbit = radius * (0.35 + nr*0.85);
+        let tx = anchor.x + Math.cos(na)*orbit;
+        let ty = anchor.y + Math.sin(na)*orbit*0.85;
+
+        // occasional landing on the anchor
+        if (!g.landing && Math.random() < 0.0009*(0.5+pull)){
+          g.landing = true; g.landTimer = 20 + Math.random()*40;
+        }
+        if (g.landing){
+          tx = anchor.x + p5rand(-6,6); ty = anchor.y + p5rand(-6,6);
+          g.landTimer--; if (g.landTimer<=0){ g.landing=false;
+            g.vx += p5rand(-3,3)*speed; g.vy += p5rand(-3,3)*speed; }
+        }
+
+        // steering toward target
+        let dx = tx - g.x, dy = ty - g.y;
+        const dist = Math.hypot(dx,dy)||1;
+        const desired = (0.25 + pull*0.9);
+        g.vx += (dx/dist) * desired * speed * 0.25;
+        g.vy += (dy/dist) * desired * speed * 0.25;
+
+        // erratic jitter (perlin-ish + random)
+        const jx = (s.noise(g.seed+9, t*0.03)-0.5);
+        const jy = (s.noise(g.seed+21, t*0.03)-0.5);
+        g.vx += (jx*2 + p5rand(-1,1)) * jit * speed * g.wob;
+        g.vy += (jy*2 + p5rand(-1,1)) * jit * speed * g.wob;
+
+        // clamp speed
+        const maxV = (g.landing?0.6:2.4) * speed;
+        const sp = Math.hypot(g.vx,g.vy);
+        if (sp > maxV){ g.vx = g.vx/sp*maxV; g.vy = g.vy/sp*maxV; }
+        g.vx *= 0.92; g.vy *= 0.92;
+
+        g.x += g.vx; g.y += g.vy;
+
+        // soft bounds — keep them in frame
+        if (g.x<4){g.x=4;g.vx*=-.5;} if (g.x>W-4){g.x=W-4;g.vx*=-.5;}
+        if (g.y<4){g.y=4;g.vy*=-.5;} if (g.y>H-4){g.y=H-4;g.vy*=-.5;}
+
+        const r = P.gsize * g.size * (g.landing?0.85:1);
+        s.fill(col);
+        s.circle(g.x, g.y, r);
+        // faint wing blur
+        s.fill(s.red(col), s.green(col), s.blue(col), 40);
+        s.circle(g.x, g.y, r*2.2);
+      }
+
+      updateHUD(anchor);
+    };
+
+    function drawVideoCover(video){
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const scale = Math.max(W/vw, H/vh);
+      const dw = vw*scale, dh = vh*scale;
+      const ox = (W-dw)/2, oy = (H-dh)/2;
+      s.push();
+      s.translate(W,0); s.scale(-1,1);   // mirror
+      s.image(video, W-(ox+dw), oy, dw, dh);
+      s.pop();
+    }
+
+    s.mousePressed = function(){
+      if (s.mouseX>=0 && s.mouseX<=W && s.mouseY>=0 && s.mouseY<=H){
+        manual = { x:s.mouseX, y:s.mouseY };
+        setAutoTrack(false);  // a manual click overrides face tracking
+      }
+    };
+  };
+
+  function updateHUD(anchor){
+    document.getElementById("count").textContent = gnats.length;
+    const status = document.getElementById("status");
+    const dot = document.getElementById("statusDot");
+    if (anchor.tracking){
+      status.innerHTML = 'anchor: face <span class="dot live" id="statusDot"></span>';
+    } else if (window.cam && window.cam.on && autoTrack){
+      status.innerHTML = 'anchor: searching… <span class="dot seek" id="statusDot"></span>';
+    } else {
+      status.innerHTML = 'anchor: manual <span class="dot" id="statusDot"></span>';
+    }
+  }
+
+  // ---- wire up controls ----
+  function bindSlider(id, key, fmt, after){
+    const el = document.getElementById("s_"+id);
+    const out = document.getElementById("v_"+id);
+    const apply = ()=>{
+      let v = parseFloat(el.value);
+      P[key] = v;
+      out.textContent = fmt ? fmt(v) : v;
+      if (after) after(v);
+    };
+    el.addEventListener("input", apply); apply();
+  }
+
+  function setAutoTrack(on){
+    autoTrack = on;
+    const b = document.getElementById("btnTrack");
+    b.setAttribute("aria-pressed", on?"true":"false");
+    b.textContent = "Auto-track face: " + (on?"on":"off");
+  }
+
+  window.addEventListener("DOMContentLoaded", ()=>{
+    bindSlider("count","count",v=>Math.round(v),v=>{
+      resizeSwarm(v);
+      document.getElementById("subCount").textContent = Math.round(v)+" gnats";
+    });
+    bindSlider("speed","speed",v=>v.toFixed(1));
+    bindSlider("radius","radius",v=>Math.round(v));
+    bindSlider("jitter","jitter",v=>Math.round(v));
+    bindSlider("pull","pull",v=>Math.round(v));
+    bindSlider("gsize","gsize",v=>v.toFixed(1));
+    bindSlider("trail","trail",v=>Math.round(v));
+
+    // swatches
+    const sw = document.getElementById("swatches");
+    PALETTE.forEach((c,i)=>{
+      const d = document.createElement("div");
+      d.className = "swatch"+(i===0?" sel":"");
+      d.style.background = c;
+      d.addEventListener("click", ()=>{
+        P.colour = c;
+        [...sw.children].forEach(x=>x.classList.remove("sel"));
+        d.classList.add("sel");
+      });
+      sw.appendChild(d);
+    });
+
+    // buttons
+    const camMsg = document.getElementById("camMsg");
+    const btnCam = document.getElementById("btnCam");
+    btnCam.addEventListener("click", async ()=>{
+      if (window.cam && window.cam.on){
+        window.stopCamera(); btnCam.textContent = "Enable camera";
+        btnCam.classList.add("primary"); camMsg.textContent = "";
+        return;
+      }
+      btnCam.disabled = true;
+      const ok = await window.startCamera(m=>camMsg.textContent=m);
+      btnCam.disabled = false;
+      if (ok){
+        btnCam.textContent = "Disable camera";
+        btnCam.classList.remove("primary");
+        setAutoTrack(true);
+        document.getElementById("hint").textContent = "tracking your face — move around";
+      }
+    });
+
+    document.getElementById("btnTrack").addEventListener("click", ()=>setAutoTrack(!autoTrack));
+    document.getElementById("btnReset").addEventListener("click", ()=>{
+      manual = { x:W/2, y:H/2 }; setAutoTrack(false);
+    });
+    document.getElementById("btnScatter").addEventListener("click", ()=>{
+      for (const g of gnats){ g.vx += p5rand(-14,14); g.vy += p5rand(-14,14); g.landing=false; }
+    });
+
+    new p5(sketch);
+  });
+})();
+</script>
+</body>
+</html>
